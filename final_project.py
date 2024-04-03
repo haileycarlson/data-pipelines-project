@@ -17,7 +17,6 @@ LOG_JSON_PATH = f's3://{S3_BUCKET}/log_json_path.json'
 REGION = 'us-west-2'
 AWS_CREDENTIALS_ID = 'aws_crentials'
 REDSHIFT_CONN_ID = 'redshift'
-DAG_ID = 'dag'
 
 default_args = {
     'owner': 'udacity',

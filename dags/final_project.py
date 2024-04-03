@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from . import sql_statements
 import pendulum
 import os
 from airflow.decorators import dag
@@ -8,7 +9,7 @@ from final_project_operators.load_fact import LoadFactOperator
 from final_project_operators.load_dimension import LoadDimensionOperator
 from final_project_operators.data_quality import DataQualityOperator
 # from udacity.common import sql_statements
-from helpers import SqlQueries, sql_statements
+from helpers import SqlQueries
 
 S3_BUCKET = 'udacity-dend'
 S3_LOG_KEY = 'log_data/{execution_date.year}/{execution_date,month}'

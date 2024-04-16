@@ -9,7 +9,7 @@ from final_project_operators.load_fact import LoadFactOperator
 from final_project_operators.load_dimension import LoadDimensionOperator
 from final_project_operators.data_quality import DataQualityOperator
 # from udacity.common import sql_statements
-from helpers import SqlQueries
+from helpers.sql_statements import SqlQueries
 
 S3_BUCKET = 'udacity-dend'
 S3_LOG_KEY = 'log_data/{execution_date.year}/{execution_date,month}'

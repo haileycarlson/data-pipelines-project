@@ -8,7 +8,7 @@ This project involves building an ETL pipeline using Apache Airflow to load, tra
 
 - DAG Configuration
 - Operators
-    -Stage Operator
+    - Stage Operator
     - Fact and Dimension Operators
     - Data Quality Operator
 

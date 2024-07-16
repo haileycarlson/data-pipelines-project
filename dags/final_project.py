@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
-from . import sql_statements
 import pendulum
 import os
+import sys
 from airflow.decorators import dag
 from airflow.operators.dummy_operator import DummyOperator
 from final_project_operators.stage_redshift import StageToRedshiftOperator
@@ -9,46 +9,54 @@ from final_project_operators.load_fact import LoadFactOperator
 from final_project_operators.load_dimension import LoadDimensionOperator
 from final_project_operators.data_quality import DataQualityOperator
 # from udacity.common import sql_statements
-from helpers.sql_statements import SqlQueries
+from helpers import SqlQueries
 
 S3_BUCKET = 'udacity-dend'
-S3_LOG_KEY = 'log_data/{execution_date.year}/{execution_date,month}'
+S3_LOG_KEY = 'log_data'
 S3_SONG_KEY = 'song_data'
 LOG_JSON_PATH = f's3://{S3_BUCKET}/log_json_path.json'
 REGION = 'us-west-2'
-AWS_CREDENTIALS_ID = 'aws_crentials'
+AWS_CREDENTIALS_ID = 'aws_credentials'
 REDSHIFT_CONN_ID = 'redshift'
+
 
 default_args = {
     'owner': 'udacity',
+    'depends_on_past': False,
     'start_date': pendulum.now(),
+    'retries': 3,
+    'retry_delay': timedelta(minutes=5),
+    'cathcup': False,
+    'email_on_retry': False,
+
 }
 
 @dag(
     default_args=default_args,
     description='Load and transform data in Redshift with Airflow',
-    schedule_interval='0 * * * *'
+    schedule_interval='@hourly'
 )
 def final_project():
 
     start_operator = DummyOperator(task_id='Begin_execution')
 
+
     stage_events_to_redshift = StageToRedshiftOperator(
-        task_id='Stage_events',
+        task_id='Staging_events',
         redshift_conn_id = REDSHIFT_CONN_ID,
         aws_credentials_id = AWS_CREDENTIALS_ID,
         table = "staging_events",
         s3_bucket = S3_BUCKET,
         s3_key = S3_LOG_KEY,
         region = REGION,
-        data_format = f"JSON '{LOG_JSON_PATH}'",
+        data_format = "JSON 'auto'",
     )
 
     stage_songs_to_redshift = StageToRedshiftOperator(
         task_id='Stage_songs',
         redshift_conn_id = REDSHIFT_CONN_ID,
         aws_credentials_id = AWS_CREDENTIALS_ID,
-        table = "staging_events",
+        table = "staging_songs",
         s3_bucket = S3_BUCKET,
         s3_key = S3_LOG_KEY,
         region = REGION,
@@ -64,50 +72,52 @@ def final_project():
 
     load_user_dimension_table = LoadDimensionOperator(
         task_id='Load_user_dim_table',
-        default_args = default_args,
         postgres_conn_id = REDSHIFT_CONN_ID,
-        sql_queries = SqlQueries.user_table_insert,
-        table = 'users',
+        sql = SqlQueries.user_table_insert,
+        table = '"users"',
     )
 
     load_song_dimension_table = LoadDimensionOperator(
         task_id='Load_song_dim_table',
-        default_args = default_args,
         postgres_conn_id = REDSHIFT_CONN_ID,
-        sql_queries = SqlQueries.song_table_insert,
-        table = 'users',
+        sql = SqlQueries.song_table_insert,
+        table = 'song',
     )
 
     load_artist_dimension_table = LoadDimensionOperator(
         task_id='Load_artist_dim_table',
-        default_args = default_args,
         postgres_conn_id = REDSHIFT_CONN_ID,
-        sql_queries = SqlQueries.artist_table_insert,
-        table = 'artists',
+        sql = SqlQueries.artist_table_insert,
+        table = 'artist',
     )
 
     load_time_dimension_table = LoadDimensionOperator(
         task_id='Load_time_dim_table',
-        default_args = default_args,
         postgres_conn_id = REDSHIFT_CONN_ID,
-        sql_queries = SqlQueries.time_table_insert,
+        sql = SqlQueries.time_table_insert,
         table = 'time',
     )
-    tables = ['staging_events', 'staging_songs', 'songplays', 'users', 'songs', 'artists', 'time']
+
     run_quality_checks = DataQualityOperator(
         task_id='Run_data_quality_checks',
         postgres_conn_id = REDSHIFT_CONN_ID,
-        tests = [DataQualityOperator.no_results_test(table) for table in tables],
+        tests = [
+            {"check_sql": "SELECT COUNT(*) FROM users WHERE user_id IS NULL", "expected_result": 0},
+            {"check_sql": "SELECT COUNT(*) FROM song WHERE title IS NULL", "expected_result": 0},
+            {"check_sql": "SELECT COUNT(*) FROM artist WHERE name IS NULL", "expected_result": 0},
+            {"check_sql": "SELECT COUNT(*) FROM time WHERE month IS NULL", "expected_result": 0},
+            {"check_sql": "SELECT COUNT(*) FROM songplays WHERE user_id IS NULL", "expected_result": 0}
+        ]
     )
 
-    start_operator >> stage_events_to_redshift
-    start_operator >> stage_songs_to_redshift
-    stage_events_to_redshift >> load_songplays_table
-    load_songplays_table >> load_user_dimension_table
-    load_user_dimension_table >> load_song_dimension_table
-    load_song_dimension_table >> load_artist_dimension_table
-    load_artist_dimension_table >> load_time_dimension_table
-    load_time_dimension_table >> run_quality_checks
+    end_operator = DummyOperator(task_id = 'Stop_execution')
+
+ 
+    start_operator >> [stage_events_to_redshift, stage_songs_to_redshift]
+    [stage_events_to_redshift, stage_songs_to_redshift] >> load_songplays_table
+    load_songplays_table >> [load_user_dimension_table, load_song_dimension_table, load_artist_dimension_table, load_time_dimension_table]
+    [load_user_dimension_table, load_song_dimension_table, load_artist_dimension_table, load_time_dimension_table] >> run_quality_checks
+    run_quality_checks >> end_operator
 
 
 final_project_dag = final_project()

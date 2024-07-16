@@ -58,7 +58,7 @@ CREATE TABLE public.songplay
 );
 
 
-CREATE TABLE public.user
+CREATE TABLE public.users
 (
     user_id            int,
     first_name         text,

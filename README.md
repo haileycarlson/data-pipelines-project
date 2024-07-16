@@ -54,18 +54,7 @@ The 'DataQualityOperator' runs checks on the data to ensure its integrity.
 ## Dependencies and Graph View
 
 The task dependencies are configured to ensure the correct order of operations. The graph view follows the flow shown below:
-`
-Begin_execution
-     |
-Stage_events_to_redshift --> Load_songplays_fact_table --> Load_user_dim_table
-     |                                         |                     |
-Stage_songs_to_redshift                        |                     |
-                                                -----------------------
-                                                            |
-                                                   Run_data_quality_checks
-                                                            |
-                                                   Stop_execution
-`                                                
+![Graph of data pipeline flowchart](/data_pipeline_flowchart.png)                                          
 
 ## Conclusion
 
